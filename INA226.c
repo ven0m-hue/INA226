@@ -2,7 +2,7 @@
  * INA226.c
  *
  *  Created on: Mar 15, 2023
- *      Author: Redwing
+ *      Author: Venom
  */
 
 #include "INA226.h"
