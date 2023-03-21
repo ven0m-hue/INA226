@@ -2,7 +2,7 @@
  * INA226.h
  *
  *  Created on: Mar 15, 2023
- *      Author: Redwing
+ *      Author: Venom
  */
 
 
