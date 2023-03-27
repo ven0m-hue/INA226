@@ -20,7 +20,7 @@
 /*
  * Config Functions 
  */
-void INA226_Init(INA226_Handle_t* hINA266)
+uint8_t INA226_Init(INA226_Handle_t* hINA266)
 {
 
 	uint8_t raw[2] = {0};
@@ -42,13 +42,13 @@ void INA226_Init(INA226_Handle_t* hINA266)
 	config = INA226_CONFIG_RST;
 	raw[0] = (config & 0xff00) >> 8;  //MSB Byte --> sent first
 	raw[1] = (config & 0x00ff);       //LSB Byte
-	writeByte(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CONFIG, raw);
+	writeMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CONFIG, raw);
 
     // Set configuration register
     config |= INA226_CONFIG_DEF | INA226_CONFIG_AVG | INA226_CONFIG_VBUS | INA226_CONFIG_VSHC | INA226_CONFIG_MODE;
 	raw[0] = (config & 0xff00) >> 8;  //MSB Byte --> sent first
 	raw[1] = (config & 0x00ff);       //LSB Byte
-	writeByte(hINA266, INA226_ADDRESS, INA226_REG_CONFIG, raw);
+	writeMem(hINA266, INA226_ADDRESS, INA226_REG_CONFIG, raw);
 
     // Set shunt resistor value and calibration factor
     hINA266->shuntResistor = INA226_DEFAULT_SHUNT_RESISTOR;
@@ -116,7 +116,7 @@ uint8_t INA226_Calibrate(INA226_Handle_t* hINA266)
 	
 	raw[0] = (calib & 0x0000ff00) >> 8;  //MSB Byte --> sent first
 	raw[1] = (calib & 0x000000ff);       //LSB Byte
-	writeByte(hINA266, INA226_ADDRESS, INA226_REG_CONFIG, raw);
+	writeMem(hINA266, INA226_ADDRESS, INA226_REG_CONFIG, raw);
 
 	maxCurrent = hINA266->current_LSB * 32768;
 	hINA266->expectedCurr = maxCurrent;
