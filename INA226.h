@@ -59,7 +59,7 @@ typedef enum
 /*
  * Config Functions 
  */
-void INA226_Init(INA226_Handle_t* hINA266);
+uint8_t INA226_Init(INA226_Handle_t* hINA266);
 uint8_t  INA226_Calibrate(INA226_Handle_t* hINA266);
 
 /*
@@ -75,14 +75,14 @@ float INA226_ReadPower(INA226_Handle_t* hINA266);
 /*
  * Helper Functions
  */
-uint8_t writeByte(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t data);
-uint8_t readByte(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress);
+static uint8_t INA226_writeByte(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t data);
+static uint8_t INA226_readByte(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress);
 
-uint8_t writeMem(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* data);
-uint8_t readMem(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* raw);
+static uint8_t INA226_writeMem(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* data);
+static uint8_t INA226_readMem(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* raw);
 
-uint8_t writeMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t data);
-uint8_t readMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* raw);
+static uint8_t INA226_writeMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t data);
+static uint8_t INA226_readMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* raw);
 
 
 
