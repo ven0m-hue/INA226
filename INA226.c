@@ -144,7 +144,7 @@ float INA226_ReadCurrent(INA226_Handle_t* hINA266)
 
 	else ret = INA226_SUCESS;
 
-	hINA266->current = ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
+	hINA266->current = (((uint16_t)((uint16_t)raw[0] << 8 | raw[1]))) * hINA266->current_LSB;
 
 	return ret;
 }
