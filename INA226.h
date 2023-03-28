@@ -91,7 +91,7 @@ static uint8_t INA226_readMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, u
  */
 
 // INA226 I2C address
-#define INA226_ADDRESS      0x40
+#define INA226_ADDRESS      (0x40 << 1)  // 7 bit Address shifted to the left (LSB = R/W)
 
 // INA226 register addresses
 #define INA226_REG_CONFIG   0x00
