@@ -26,6 +26,8 @@ typedef struct
 
     float current_LSB;
 
+    float power_LSB;
+
     float expectedCurr;
 
     //Output 
@@ -36,6 +38,11 @@ typedef struct
     float busVoltage;
 
     float power;
+
+
+    //Limits
+    float shuntVoltageMax;
+    float BustVoltageMax;
 
 
 } INA226_Handle_t;
@@ -60,7 +67,7 @@ typedef enum
  * Config Functions 
  */
 uint8_t INA226_Init(INA226_Handle_t* hINA266);
-uint8_t  INA226_Calibrate(INA226_Handle_t* hINA266);
+uint8_t INA226_Calibrate(INA226_Handle_t* hINA266);
 
 /*
  * Core Functions 
@@ -91,7 +98,7 @@ static uint8_t INA226_readMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, u
  */
 
 // INA226 I2C address
-#define INA226_ADDRESS      (0x40 << 1)  // 7 bit Address shifted to the left (LSB = R/W)
+#define INA226_ADDRESS      (0x40<<1)
 
 // INA226 register addresses
 #define INA226_REG_CONFIG   0x00
@@ -105,12 +112,15 @@ static uint8_t INA226_readMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, u
 #define INA226_REG_ID       0xFE
 #define INA226_DIE_ID       0xFF
 
+// INA225 Read-Only register values
+#define INA226_REG_ID_VALUE	0x5549
+
 // INA226 Default Hardware Setting 
 #define INA226_DEFAULT_SHUNT_RESISTOR       0.002f
 #define INA226_DEFAULT_CALIBRATION_FACTOR   1 
-#define INA226_ERR_SHUNTVOLTAGE_HIGH        NULL
-#define INA226_ERR_MAXCURRENT_LOW           NULL
-#define INA226_ERR_SHUNT_LOW                NULL
+#define INA226_ERR_SHUNTVOLTAGE_HIGH        0
+#define INA226_ERR_MAXCURRENT_LOW           0
+#define INA226_ERR_SHUNT_LOW                0
 
 // INA226 configuration register bit masks @more info read Datasheet pg.22-23
 #define INA226_CONFIG_RST   (1 << 15)
@@ -130,5 +140,5 @@ static uint8_t INA226_readMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, u
 #define INA226_MODE_BUS_CONTINUOUS   6
 #define INA226_MODE_SHUNT_BUS_CONTINUOUS 7
 
-#define INA226_I2C_TIMEOUT	50
+#define INA226_I2C_TIMEOUT	100
 #endif /* INC_INA226_H_ */
