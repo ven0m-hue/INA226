@@ -140,7 +140,7 @@ uint8_t INA226_Calibrate(INA226_Handle_t* hINA266)
 
 	calibrationValue = (uint16_t)((0.00512) / (currentLSB * rShunt));
 
-	calibrationValue = 1024;
+	//calibrationValue = 1024; test value!
 
 	/*
 	 *	Write to the I2C register
@@ -309,7 +309,7 @@ float INA226_ReadCurrent(INA226_Handle_t* hINA266)
 	//Store the result in the global struct 
 	hINA266->current = (((uint16_t)((uint16_t)raw[0] << 8 | raw[1])));
 
-	return hINA266->current * 40/1024;
+	return hINA266->current * hINA266->current_LSB;
 
 }
 
