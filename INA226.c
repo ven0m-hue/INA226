@@ -7,7 +7,6 @@
 
 #include "INA226.h"
 
-
 /*
  *  API Calls
  *
@@ -18,8 +17,9 @@
  */
 
 /*
- * Config Functions 
+ *  {Config Functions}
  */
+
 uint8_t INA226_Init(INA226_Handle_t* hINA266)
 {
 
@@ -28,38 +28,152 @@ uint8_t INA226_Init(INA226_Handle_t* hINA266)
 	INA226_OpStatus_t ret = INA226_ERROR;
 
     // Read hINA266ice ID to verify communication
-	INA226_readMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_ID, raw);
+	if((INA226_readMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_ID, raw)) != INA226_SUCESS);
+	else ret = INA226_SUCESS;
+
 	uint16_t id =  ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
-    if (id != INA226_REG_ID) {
+    if (id != INA226_REG_ID_VALUE) {
         // Communication error - handle appropriately
-        return;
+        return ret;
     }
 
     // Reset hINA266ice configuration to default values
 	uint16_t config = 0;
 
+	if((INA226_readMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CONFIG, raw)) != INA226_SUCESS);
+	else ret = INA226_SUCESS;
+
+
+	uint16_t temp =  ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
+
     //INA226_WriteRegister(hINA266, INA226_REG_CONFIG, INA226_CONFIG_RST);
-	config = INA226_CONFIG_RST;
+	config |= INA226_CONFIG_RST;
 	raw[0] = (config & 0xff00) >> 8;  //MSB Byte --> sent first
 	raw[1] = (config & 0x00ff);       //LSB Byte
-	INA226_writeMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CONFIG, raw);
+	if((INA226_writeMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CONFIG, raw)) != INA226_SUCESS);
+	else ret = INA226_SUCESS;
+
+	temp =  ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
+
+	if((INA226_readMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CONFIG, raw)) != INA226_SUCESS);
+	else ret = INA226_SUCESS;
+
+	temp =  ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
+
+	ret = temp == config ? INA226_SUCESS : INA226_ERROR;
 
     // Set configuration register
+	config = 0;
     config |= INA226_CONFIG_DEF | INA226_CONFIG_AVG | INA226_CONFIG_VBUS | INA226_CONFIG_VSHC | INA226_CONFIG_MODE;
 	raw[0] = (config & 0xff00) >> 8;  //MSB Byte --> sent first
 	raw[1] = (config & 0x00ff);       //LSB Byte
-	INA226_writeMem(hINA266, INA226_ADDRESS, INA226_REG_CONFIG, raw);
+
+	temp = ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
+
+	if((INA226_writeMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CONFIG, raw)) != INA226_SUCESS);
+	else ret = INA226_SUCESS;
+
+	if((INA226_readMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CONFIG, raw)) != INA226_SUCESS);
+	else ret = INA226_SUCESS;
+
+	temp =  ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
+
+	ret = temp == config ? INA226_SUCESS : INA226_ERROR;
+
 
     // Set shunt resistor value and calibration factor
     hINA266->shuntResistor = INA226_DEFAULT_SHUNT_RESISTOR;
     hINA266->calibrationFactor = INA226_DEFAULT_CALIBRATION_FACTOR;
-}
 
+    //Limits
+    hINA266->BustVoltageMax = 36;
+    hINA266->shuntVoltageMax = 0.08192f;
+
+    return ret;
+
+}
 
 
 
 uint8_t INA226_Calibrate(INA226_Handle_t* hINA266)
 {
+
+	/*
+	 *  Below calculations are based on the formulas provided in the datasheet
+	 *  For more info refer @datasheet pg
+	 */
+
+	INA226_OpStatus_t ret = INA226_ERROR;
+
+	//I2c Bytes
+	uint8_t raw[2] = {0};
+
+	float currentLSB = 0;
+	float powerLSB= 0;
+
+	float maxCurrent = hINA266->expectedCurr;
+	float shunt = hINA266->shuntResistor;
+	float shuntVoltage = abs( maxCurrent * shunt);
+	if (shuntVoltage > 0.080) return INA226_ERR_SHUNTVOLTAGE_HIGH;
+	if (maxCurrent < 0.001)   return INA226_ERR_MAXCURRENT_LOW;
+	if (shunt < 0.001)        return INA226_ERR_SHUNT_LOW;
+
+	uint16_t calibrationValue;
+	float rShunt = hINA266->shuntResistor;
+
+	float iMaxPossible, minimumLSB;
+
+	iMaxPossible = hINA266->shuntVoltageMax / rShunt;
+
+	minimumLSB = hINA266->expectedCurr / 32767;
+
+	currentLSB = (uint16_t)(minimumLSB * 100000000);
+	currentLSB /= 100000000;
+	currentLSB /= 0.0001;
+	currentLSB = ceil(currentLSB);
+	currentLSB *= 0.0001;
+	hINA266->current_LSB = currentLSB;
+
+	powerLSB = currentLSB * 25;
+
+	hINA266->power_LSB = powerLSB;
+
+	calibrationValue = (uint16_t)((0.00512) / (currentLSB * rShunt));
+
+	calibrationValue = 1024;
+
+	/*
+	 *	Write to the I2C register
+	 *  Explicitly masked as 0x0000ff00 and 0x000000ff
+	 * 	However just 0xff00 and 0x00ff works
+	 */
+
+	raw[0] = (calibrationValue & 0x0000ff00) >> 8;  //MSB Byte --> sent first
+	raw[1] = (calibrationValue & 0x000000ff);       //LSB Byte
+
+	if((INA226_writeMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CALIB, raw)) != INA226_SUCESS);
+	else ret = INA226_SUCESS;
+
+
+	if((INA226_readMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CALIB, raw)) != INA226_SUCESS);
+	else ret = INA226_SUCESS;
+
+	uint16_t temp =  ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
+
+	ret = (temp == calibrationValue) ? INA226_SUCESS : INA226_ERROR;
+
+
+	maxCurrent = hINA266->current_LSB * 32768;
+	hINA266->expectedCurr = maxCurrent;
+
+	return ret;
+
+}
+
+#if 0
+uint8_t INA226_Calibrate(INA226_Handle_t* hINA266)
+{
+
 	/*
 	 *  Below calculations are based on the formulas provided in the datasheet
 	 *  For more info refer @datasheet pg 
@@ -94,8 +208,8 @@ uint8_t INA226_Calibrate(INA226_Handle_t* hINA266)
 		factor = 1;
 		while (hINA266->current_LSB < 1)
 		{
-		hINA266->current_LSB *= 10;
-		factor *= 10;
+			hINA266->current_LSB *= 10;
+			factor *= 10;
 		}
 		hINA266->current_LSB = 1.0 / factor;
 	}
@@ -116,24 +230,72 @@ uint8_t INA226_Calibrate(INA226_Handle_t* hINA266)
 	
 	raw[0] = (calib & 0x0000ff00) >> 8;  //MSB Byte --> sent first
 	raw[1] = (calib & 0x000000ff);       //LSB Byte
-	INA226_writeMem(hINA266, INA226_ADDRESS, INA226_REG_CONFIG, raw);
+
+	if((INA226_writeMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CALIB, raw)) != INA226_SUCESS);
+	else ret = INA226_SUCESS;
+
+
+	if((INA226_readMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_CALIB, raw)) != INA226_SUCESS);
+	else ret = INA226_SUCESS;
+
+	uint16_t temp =  ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
+
+	ret = temp == calib ? INA226_SUCESS : INA226_ERROR;
+
 
 	maxCurrent = hINA266->current_LSB * 32768;
 	hINA266->expectedCurr = maxCurrent;
 
-	ret = INA226_SUCESS;
+	return ret;
+
+}
+#endif
+/*
+ * {Core Functions}
+ */
+float INA226_ReadBusVoltage(INA226_Handle_t* hINA266)
+{
+
+	INA226_OpStatus_t ret = INA226_ERROR;
+
+	uint8_t raw[2] = {0};
+
+	if((hINA266->I2Chandle == NULL)) return ret;
+
+	if(INA226_readMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_BUS, raw) != INA226_SUCESS );
+
+	else ret = INA226_SUCESS;
+
+	//Store the result in the global struct 
+	hINA266->busVoltage = ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
 
 	return ret;
+
 }
 
-/*
- * Core Functions 
- */
-float INA226_ReadBusVoltage(INA226_Handle_t* hINA266);
-float INA226_ReadShuntVoltage(INA226_Handle_t* hINA266);
+float INA226_ReadShuntVoltage(INA226_Handle_t* hINA266)
+{
+
+	INA226_OpStatus_t ret = INA226_ERROR;
+
+	uint8_t raw[2] = {0};
+
+	if((hINA266->I2Chandle == NULL)) return ret;
+
+	if(INA226_readMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_SHUNT, raw) != INA226_SUCESS );
+
+	else ret = INA226_SUCESS;
+
+	//Store the result in the global struct 
+	hINA266->shuntVoltage = ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
+
+	return ret;
+
+}
 
 float INA226_ReadCurrent(INA226_Handle_t* hINA266)
 {
+
 	INA226_OpStatus_t ret = INA226_ERROR;
 
 	uint8_t raw[2] = {0};
@@ -144,17 +306,41 @@ float INA226_ReadCurrent(INA226_Handle_t* hINA266)
 
 	else ret = INA226_SUCESS;
 
-	hINA266->current = (((uint16_t)((uint16_t)raw[0] << 8 | raw[1]))) * hINA266->current_LSB;
+	//Store the result in the global struct 
+	hINA266->current = (((uint16_t)((uint16_t)raw[0] << 8 | raw[1])));
 
-	return ret;
+	return hINA266->current * 40/1024;
+
 }
 
 
+float INA226_ReadPower(INA226_Handle_t* hINA266)
+{
 
-float INA226_ReadPower(INA226_Handle_t* hINA266);
+	INA226_OpStatus_t ret = INA226_ERROR;
 
+	uint8_t raw[2] = {0};
 
-uint8_t INA226_writeByte(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t data)
+	if((hINA266->I2Chandle == NULL)) return ret;
+
+	if(INA226_readMem(hINA266->I2Chandle, INA226_ADDRESS, INA226_REG_POWER, raw) != INA226_SUCESS );
+
+	else ret = INA226_SUCESS;
+
+	//Store the result in the global struct 
+	hINA266->power = ((uint16_t)((uint16_t)raw[0] << 8 | raw[1]));
+
+	return ret;
+
+}
+
+/*
+ *
+ *  {Helper Functions}
+ * 
+*/
+
+static uint8_t INA226_writeByte(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t data)
 {
 
 	 uint8_t txData[] = {subAddress, data};
@@ -166,8 +352,9 @@ uint8_t INA226_writeByte(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t 
 
 }
 
-uint8_t INA226_readByte(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress)
+static uint8_t INA226_readByte(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress)
 {
+
 	uint8_t rxData[1] = {0};
 	uint8_t txData[] = {subAddress};
 	HAL_I2C_Master_Transmit(I2Chandle, Address, txData, 1, AS5600_I2C_TIMEOUT);
@@ -183,19 +370,23 @@ uint8_t INA226_readByte(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t s
  * This API is non-generic and blocking mode.
  */
 
-uint8_t INA226_writeMem(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* data)
+static uint8_t INA226_writeMem(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* data)
 {
 
-	if(HAL_I2C_Mem_Write(I2Chandle, Address, subAddress, I2C_MEMADD_SIZE_8BIT, data, 2, INA226_I2C_TIMEOUT) != HAL_ERROR);
+	if(HAL_I2C_Mem_Write(I2Chandle, Address, subAddress, I2C_MEMADD_SIZE_8BIT, data, 2, INA226_I2C_TIMEOUT) != HAL_ERROR)
+	{
+		return 1;
+	}
 
-	return 1;
+	return 0;
+
 }
 
 /*
  * Reads bytes of data
  */
 
-uint8_t INA226_readMem(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* raw)
+static uint8_t INA226_readMem(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* raw)
 {
 
 	uint8_t rawData[2];
@@ -218,7 +409,7 @@ uint8_t INA226_readMem(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t su
  * This API is non-generic and non-blocking mode.
  * User can have their own interface for reading the data in a seperate callback function.
  */
-uint8_t INA226_writeMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t data)
+static uint8_t INA226_writeMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t data)
 {
 
 
@@ -232,7 +423,7 @@ uint8_t INA226_writeMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t
  * This API is non-generic and non-blocking mode.
  * User can have their own interface for reading the data in a seperate callback function.
  */
-uint8_t INA226_readMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* raw)
+static uint8_t INA226_readMemIT(I2C_HandleTypeDef *I2Chandle, uint8_t Address, uint8_t subAddress, uint8_t* raw)
 {
 
 	uint8_t rawData[2];
